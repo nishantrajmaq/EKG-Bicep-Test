@@ -218,16 +218,6 @@ module containerAppsEnv 'modules/containerAppsEnv.bicep' = {
 }
 
 // -----------------------------------------------------------------------------
-// Entra ID App Registrations (If Required)
-// -----------------------------------------------------------------------------
-module entraApps 'modules/entraApps.bicep' = if (!empty(adminPrincipalId)) {
-  name: 'entraApps'
-  params: {
-    namePrefix: names.managedIdentity
-  }
-}
-
-// -----------------------------------------------------------------------------
 // Azure Front Door Premium + WAF (optional)
 // -----------------------------------------------------------------------------
 module frontDoorWaf 'modules/frontDoorWaf.bicep' = if (deployFrontDoor) {
