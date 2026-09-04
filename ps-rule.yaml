@@ -13,6 +13,11 @@ configuration:
 execution:
   unprocessedObject: Ignore
 
+input:
+  pathIgnore:
+    - 'bicepconfig.json'
+    - 'modules/**/*.bicep'
+
 output:
   culture:
     - en-US
