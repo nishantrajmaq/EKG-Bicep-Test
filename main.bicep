@@ -1,3 +1,4 @@
+using './main.bicep'
 // =============================================================================
 // EKG Platform - Minimal Deployment (resource group scope)
 // Deploys core networking, identity, and security resources only
