@@ -15,9 +15,8 @@ execution:
 
 input:
   pathIgnore:
-    - 'bicepconfig.json'
-    - 'main.bicep'
-    - 'modules/**/*.bicep'
+    - '**'
+    - '!main.bicepparam'
 
 output:
   culture:

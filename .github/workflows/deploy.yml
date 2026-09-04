@@ -43,7 +43,6 @@ jobs:
         uses: microsoft/ps-rule@46451b8f5258c41beb5ae69ed7190ccbba84112c # v2.9.0
         with:
           inputType: repository
-          path: main.bicepparam
           modules: PSRule.Rules.Azure
           option: ps-rule.yaml
 
