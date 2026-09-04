@@ -31,15 +31,16 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Bicep
-        uses: azure/bicep-installer@v2
+        uses: anthony-c-martin/setup-bicep@v1
+
+      - name: Locate Bicep for PSRule
+        run: echo "PSRULE_AZURE_BICEP_PATH=$(command -v bicep)" >> "$GITHUB_ENV"
 
       - name: Build Bicep
         run: az bicep build --file main.bicep --stdout > /dev/null
 
       - name: Analyze Azure resources with PSRule
         uses: microsoft/ps-rule@46451b8f5258c41beb5ae69ed7190ccbba84112c # v2.9.0
-        env:
-          PSRULE_AZURE_BICEP_PATH: /home/runner/.azure/bin/bicep
         with:
           inputType: repository
           modules: PSRule.Rules.Azure
