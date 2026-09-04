@@ -214,9 +214,12 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
 }
 
 resource containerRegistryReplications 'Microsoft.ContainerRegistry/registries/replications@2023-07-01' = [for replicaLocation in acrReplicaLocations: {
-  parent: containerRegistry
-  name: replicaLocation
+  name: '${names.acr}-${replicaLocation}'
   location: replicaLocation
+  properties: {
+    zoneRedundancy: 'Enabled'
+  }
+  parent: containerRegistry
 }]
 
 // -----------------------------------------------------------------------------
