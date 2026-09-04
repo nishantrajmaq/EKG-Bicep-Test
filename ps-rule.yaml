@@ -16,6 +16,7 @@ execution:
 input:
   pathIgnore:
     - 'bicepconfig.json'
+    - 'main.bicep'
     - 'modules/**/*.bicep'
 
 output:
