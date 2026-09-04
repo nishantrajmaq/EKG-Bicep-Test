@@ -30,6 +30,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Install Bicep CLI
+        run: az bicep install
+
       - name: Build Bicep
         run: az bicep build --file main.bicep --stdout > /dev/null
 
