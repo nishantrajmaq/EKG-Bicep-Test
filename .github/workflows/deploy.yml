@@ -52,7 +52,8 @@ jobs:
     needs: static-analysis
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: azure-dev
+    # Keep validation separate from the protected deployment environment.
+    environment: azure-validate
     permissions:
       id-token: write
       contents: read
@@ -88,6 +89,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Manual approval configured on 'azure-dev' environment in GitHub repo settings
     environment: azure-dev
     permissions:
       id-token: write
