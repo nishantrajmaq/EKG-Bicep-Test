@@ -13,6 +13,9 @@ param actionGroupName string
 @description('Location for the resources.')
 param location string
 
+@description('Secondary region for Log Analytics workspace replication.')
+param replicaLocation string
+
 @description('Tags applied to the resources.')
 param tags object
 
@@ -22,7 +25,7 @@ param retentionInDays int = 30
 @description('Email receivers for the action group. Each item: { name, email }.')
 param emailReceivers array = []
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: logAnalyticsName
   location: location
   tags: tags
@@ -33,6 +36,10 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
     retentionInDays: retentionInDays
     features: {
       enableLogAccessUsingOnlyResourcePermissions: true
+    }
+    replication: {
+      enabled: true
+      location: replicaLocation
     }
   }
 }
@@ -46,6 +53,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
     Application_Type: 'web'
     WorkspaceResourceId: logAnalytics.id
     IngestionMode: 'LogAnalytics'
+    DisableLocalAuth: true
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
   }

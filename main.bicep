@@ -32,6 +32,14 @@ param deployFrontDoor bool = false
 @description('Front Door origin hostname without https://. Required when deployFrontDoor is true.')
 param frontDoorOriginHostName string = ''
 
+@description('Additional Azure regions for ACR geo-replication.')
+param acrReplicaLocations array = [
+  'westus2'
+]
+
+@description('Secondary region for Log Analytics workspace replication.')
+param logAnalyticsReplicaLocation string = 'centralus'
+
 // -----------------------------------------------------------------------------
 // Naming
 // -----------------------------------------------------------------------------
@@ -168,6 +176,7 @@ module monitoring 'modules/monitoring.bicep' = {
     appInsightsName: names.appInsights
     actionGroupName: names.actionGroup
     location: location
+    replicaLocation: logAnalyticsReplicaLocation
     tags: {
       environment: environmentName
       managedBy: 'bicep'
@@ -196,8 +205,19 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
   properties: {
     adminUserEnabled: false
     publicNetworkAccess: 'Disabled'
+    policies: {
+      exportPolicy: {
+        status: 'disabled'
+      }
+    }
   }
 }
+
+resource containerRegistryReplications 'Microsoft.ContainerRegistry/registries/replications@2023-07-01' = [for replicaLocation in acrReplicaLocations: {
+  parent: containerRegistry
+  name: replicaLocation
+  location: replicaLocation
+}]
 
 // -----------------------------------------------------------------------------
 // Container Apps Environment

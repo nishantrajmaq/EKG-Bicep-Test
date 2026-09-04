@@ -98,8 +98,11 @@ The current parameter file contains:
 | `adminPrincipalId` | Empty, so the optional admin role and Entra app module are skipped |
 | `deployFrontDoor` | `false` |
 | `frontDoorOriginHostName` | Empty; required when Front Door is enabled |
+| `acrReplicaLocations` | `['westus2']` |
+| `logAnalyticsReplicaLocation` | `centralus` |
 
 Set `adminPrincipalId` to the object ID of an administrator when the deployment should create the Key Vault Administrator assignment. Do not use an application client ID in this field.
+Set the replica locations to regions appropriate for the deployment's Azure region pair.
 
 ## Validate and Deploy
 
