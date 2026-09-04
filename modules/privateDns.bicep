@@ -9,6 +9,7 @@ param tags object
 
 var zoneNames = {
   keyVault: 'privatelink.vaultcore.azure.net'
+  containerRegistry: 'privatelink.azurecr.io'
   blob: 'privatelink.blob.${environment().suffixes.storage}'
   cosmos: 'privatelink.documents.azure.com'
   search: 'privatelink.search.windows.net'
@@ -46,8 +47,9 @@ output zoneIds object = {
   aiServices: zones[0].id
   blob: zones[1].id
   cognitiveServices: zones[2].id
-  cosmos: zones[3].id
-  keyVault: zones[4].id
-  openai: zones[5].id
-  search: zones[6].id
+  containerRegistry: zones[3].id
+  cosmos: zones[4].id
+  keyVault: zones[5].id
+  openai: zones[6].id
+  search: zones[7].id
 }

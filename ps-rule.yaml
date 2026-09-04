@@ -1,0 +1,22 @@
+requires:
+  PSRule.Rules.Azure: '1.47.0'
+
+include:
+  module:
+    - PSRule.Rules.Azure
+
+configuration:
+  AZURE_BICEP_CHECK_TOOL: true
+  AZURE_BICEP_FILE_EXPANSION: true
+  AZURE_PARAMETER_FILE_EXPANSION: true
+
+execution:
+  unprocessedObject: Ignore
+
+output:
+  culture:
+    - en-US
+  style: GitHubActions
+
+rule:
+  baseline: Azure.All

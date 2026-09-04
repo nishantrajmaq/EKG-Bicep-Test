@@ -15,6 +15,9 @@ param dnsZoneIds object
 
 param keyVaultId string
 
+@description('Resource ID of the Azure Container Registry.')
+param containerRegistryId string
+
 // ---- Key Vault ----
 resource kvPe 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: 'pep-key-vault'
@@ -47,6 +50,44 @@ resource kvDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@202
         name: 'vault'
         properties: {
           privateDnsZoneId: dnsZoneIds.keyVault
+        }
+      }
+    ]
+  }
+}
+
+// ---- Azure Container Registry ----
+resource acrPe 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: 'pep-container-registry'
+  location: location
+  tags: tags
+  properties: {
+    subnet: {
+      id: peSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'registry'
+        properties: {
+          privateLinkServiceId: containerRegistryId
+          groupIds: [
+            'registry'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+resource acrDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: acrPe
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'registry'
+        properties: {
+          privateDnsZoneId: dnsZoneIds.containerRegistry
         }
       }
     ]

@@ -2,62 +2,99 @@ name: Deploy EKG Infrastructure
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - main
+  pull_request:
+    # paths:
+      # - '**/*.bicep'
+      # - '**/*.bicepparam'
+      # - 'bicepconfig.json'
+      # - 'ps-rule.yaml'
+      # - '.github/workflows/deploy.yml'
 
 permissions:
-  id-token: write
   contents: read
+
+concurrency:
+  group: deploy-ekg-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
 
 jobs:
-  validate:
+  static-analysis:
+    name: Bicep and PSRule
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build Bicep
+        run: az bicep build --file main.bicep --stdout > /dev/null
+
+      - name: Analyze Azure resources with PSRule
+        uses: microsoft/ps-rule@46451b8f5258c41beb5ae69ed7190ccbba84112c # v2.9.0
+        env:
+          PSRULE_AZURE_BICEP_PATH: /home/runner/.azure/bin/bicep
+        with:
+          inputType: repository
+          modules: PSRule.Rules.Azure
+          option: ps-rule.yaml
+
+  validate:
+    name: Azure validate and what-if
+    if: github.event_name == 'workflow_dispatch'
+    needs: static-analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: azure-dev
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Log in to Azure
-        uses: azure/login@v2
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build Bicep
-        run: az bicep build --file main.bicep
-
       - name: Validate deployment
         run: |
           az deployment group validate \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name github-validation-${{ github.run_number }} \
+            --name github-validation-${{ github.run_id }}-${{ github.run_attempt }} \
             --template-file main.bicep \
-            --parameters main.bicepparam
+            --parameters @main.bicepparam
 
       - name: Preview deployment
         run: |
           az deployment group what-if \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name github-what-if-${{ github.run_number }} \
+            --name github-what-if-${{ github.run_id }}-${{ github.run_attempt }} \
             --template-file main.bicep \
-            --parameters main.bicepparam
+            --parameters @main.bicepparam
 
   deploy:
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     environment: azure-dev
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Log in to Azure
-        uses: azure/login@v2
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -67,6 +104,6 @@ jobs:
         run: |
           az deployment group create \
             --resource-group "$AZURE_RESOURCE_GROUP" \
-            --name github-deploy-${{ github.run_number }} \
+            --name github-deploy-${{ github.run_id }}-${{ github.run_attempt }} \
             --template-file main.bicep \
-            --parameters main.bicepparam
+            --parameters @main.bicepparam

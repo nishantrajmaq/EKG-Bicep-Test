@@ -154,6 +154,7 @@ module privateEndpoints 'modules/privateEndpoints.bicep' = {
     peSubnetId: network.outputs.peSubnetId
     dnsZoneIds: privateDns.outputs.zoneIds
     keyVaultId: keyVault.outputs.id
+    containerRegistryId: containerRegistry.id
   }
 }
 
@@ -190,10 +191,11 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' =
     createdBy: 'nishantr@maqsoftware.com'
   }
   sku: {
-    name: 'Standard'
+    name: 'Premium'
   }
   properties: {
     adminUserEnabled: false
+    publicNetworkAccess: 'Disabled'
   }
 }
 
