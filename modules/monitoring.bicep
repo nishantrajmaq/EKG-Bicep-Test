@@ -1,6 +1,9 @@
 // =============================================================================
+
 // Monitoring: Log Analytics + Application Insights + Action Group
+
 // =============================================================================
+
 @description('Log Analytics workspace name.')
 param logAnalyticsName string
 
@@ -16,6 +19,9 @@ param location string
 @description('Secondary region for Log Analytics workspace replication.')
 param replicaLocation string
 
+@description('Enable cross-region Log Analytics workspace replication.')
+param enableReplication bool = false
+
 @description('Tags applied to the resources.')
 param tags object
 
@@ -27,49 +33,74 @@ param emailReceivers array = []
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: logAnalyticsName
+
   location: location
+
   tags: tags
+
   properties: {
     sku: {
       name: 'PerGB2018'
     }
+
     retentionInDays: retentionInDays
+
     features: {
       enableLogAccessUsingOnlyResourcePermissions: true
     }
-    replication: {
-      enabled: true
-      location: replicaLocation
-    }
+
+    replication: enableReplication
+      ? {
+          enabled: true
+
+          location: replicaLocation
+        }
+      : null
   }
 }
 
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: appInsightsName
+
   location: location
+
   tags: tags
+
   kind: 'web'
+
   properties: {
     Application_Type: 'web'
+
     WorkspaceResourceId: logAnalytics.id
+
     IngestionMode: 'LogAnalytics'
+
     DisableLocalAuth: true
+
     publicNetworkAccessForIngestion: 'Enabled'
+
     publicNetworkAccessForQuery: 'Enabled'
   }
 }
 
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   name: actionGroupName
+
   location: 'global'
+
   tags: tags
+
   properties: {
     groupShortName: take(replace(actionGroupName, '-', ''), 12)
+
     enabled: true
+
     emailReceivers: [
       for r in emailReceivers: {
         name: r.name
+
         emailAddress: r.email
+
         useCommonAlertSchema: true
       }
     ]
