@@ -1,5 +1,5 @@
 name: Deploy EKG Infrastructure
-
+ 
 on:
   workflow_dispatch:
   pull_request:
@@ -9,43 +9,43 @@ on:
       # - 'bicepconfig.json'
       # - 'ps-rule.yaml'
       # - '.github/workflows/deploy.yml'
-
+ 
 permissions:
   contents: read
-
+ 
 concurrency:
   group: deploy-ekg-${{ github.ref }}
   cancel-in-progress: false
-
+ 
 env:
   AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-
+ 
 jobs:
   static-analysis:
     name: Bicep and PSRule
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
+ 
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
+ 
       - name: Install Bicep
         uses: anthony-c-martin/setup-bicep@v1
-
+ 
       - name: Locate Bicep for PSRule
         run: echo "PSRULE_AZURE_BICEP_PATH=$(command -v bicep)" >> "$GITHUB_ENV"
-
+ 
       - name: Build Bicep
         run: az bicep build --file main.bicep --stdout > /dev/null
-
+ 
       - name: Analyze Azure resources with PSRule
         uses: microsoft/ps-rule@46451b8f5258c41beb5ae69ed7190ccbba84112c # v2.9.0
         with:
           inputType: repository
           modules: PSRule.Rules.Azure
           option: ps-rule.yaml
-
+ 
   validate:
     name: Azure validate and what-if
     if: github.event_name == 'workflow_dispatch'
@@ -57,36 +57,34 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
+ 
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
+ 
       - name: Log in to Azure
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
+ 
       - name: Validate deployment
         id: validate-deployment
         run: |
           az deployment group validate \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name github-validation-${{ github.run_id }}-${{ github.run_attempt }} \
-            --template-file main.bicep \
-            --parameters @main.bicepparam
-
+            --parameters main.bicepparam
+ 
       - name: Preview deployment
         id: preview-deployment
         run: |
           az deployment group what-if \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name github-what-if-${{ github.run_id }}-${{ github.run_attempt }} \
-            --template-file main.bicep \
-            --parameters @main.bicepparam
-
+            --parameters main.bicepparam
+ 
       - name: Validation summary
         if: always()
         run: |
@@ -95,7 +93,7 @@ jobs:
           if [ "${{ steps.validate-deployment.outcome }}" = "failure" ] || [ "${{ steps.preview-deployment.outcome }}" = "failure" ]; then
             echo "Validation/preview failed. This is informational only; deployment will continue based on your branch policy."
           fi
-
+ 
   deploy:
     needs: validate
     runs-on: ubuntu-latest
@@ -105,27 +103,26 @@ jobs:
     permissions:
       id-token: write
       contents: read
-
+ 
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
+ 
       - name: Log in to Azure
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
+ 
       - name: Deploy infrastructure
         id: deploy-infrastructure
         run: |
           az deployment group create \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name github-deploy-${{ github.run_id }}-${{ github.run_attempt }} \
-            --template-file main.bicep \
-            --parameters @main.bicepparam
-
+            --parameters main.bicepparam
+ 
       - name: Deployment summary
         if: always()
         run: |
@@ -134,3 +131,5 @@ jobs:
             echo "Deployment failed. The pipeline has been stopped intentionally."
             exit 1
           fi
+ 
+ 
