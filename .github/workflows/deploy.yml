@@ -71,7 +71,6 @@ jobs:
 
       - name: Validate deployment
         id: validate-deployment
-        continue-on-error: true
         run: |
           az deployment group validate \
             --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -81,7 +80,6 @@ jobs:
 
       - name: Preview deployment
         id: preview-deployment
-        continue-on-error: true
         run: |
           az deployment group what-if \
             --resource-group "$AZURE_RESOURCE_GROUP" \
