@@ -18,6 +18,9 @@ param keyVaultId string
 @description('Resource ID of the Azure Container Registry.')
 param containerRegistryId string
 
+@description('Create the ACR private endpoint. Private Link for ACR requires the Premium SKU.')
+param deployContainerRegistryEndpoint bool = true
+
 // ---- Key Vault ----
 resource kvPe 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   name: 'pep-key-vault'
@@ -57,7 +60,7 @@ resource kvDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@202
 }
 
 // ---- Azure Container Registry ----
-resource acrPe 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+resource acrPe 'Microsoft.Network/privateEndpoints@2024-05-01' = if (deployContainerRegistryEndpoint) {
   name: 'pep-container-registry'
   location: location
   tags: tags
@@ -79,7 +82,7 @@ resource acrPe 'Microsoft.Network/privateEndpoints@2024-05-01' = {
   }
 }
 
-resource acrDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+resource acrDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (deployContainerRegistryEndpoint) {
   parent: acrPe
   name: 'default'
   properties: {

@@ -56,6 +56,8 @@ var logAnalyticsName = 'log-${prefix}'
 var appInsightsName = 'appi-${prefix}'
 var actionGroupName = 'ag-${prefix}'
 var acrName = 'acr${toLower(replace(projectName, '-', ''))}${toLower(environmentName)}${regionCode}'
+// Standard keeps ACR public (Private Link needs Premium). Use Premium to lock it down.
+var acrSku = 'Standard'
 var frontDoorProfileName = 'afd-${prefix}'
 var frontDoorEndpointName = 'afde${toLower(replace(projectName, '-', ''))}${toLower(environmentName)}${regionCode}'
 var frontDoorWafPolicyName = 'waf-${prefix}'
@@ -96,7 +98,7 @@ module containerRegistry 'modules/containerRegistry.bicep' = {
     name: acrName
     location: location
     tags: tags
-    sku: 'Standard'
+    sku: acrSku
     replicaLocations: acrReplicaLocations
   }
 }
@@ -131,6 +133,8 @@ module privateEndpoints 'modules/privateEndpoints.bicep' = {
     dnsZoneIds: privateDns.outputs.zoneIds
     keyVaultId: keyVault.outputs.id
     containerRegistryId: containerRegistry.outputs.id
+    // ACR Private Link requires the Premium SKU.
+    deployContainerRegistryEndpoint: acrSku == 'Premium'
   }
 }
 

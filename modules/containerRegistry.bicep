@@ -30,7 +30,8 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   }
   properties: {
     adminUserEnabled: false
-    publicNetworkAccess: 'Disabled'
+    // Disabling public access (Private Link) is only supported on Premium SKU.
+    publicNetworkAccess: sku == 'Premium' ? 'Disabled' : 'Enabled'
     zoneRedundancy: 'Disabled'
   }
 }
