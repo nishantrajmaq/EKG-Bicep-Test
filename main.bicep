@@ -1,279 +1,181 @@
-using './main.bicep'
-// =============================================================================
-// EKG Platform - Minimal Deployment (resource group scope)
-// Deploys core networking, identity, and security resources only
-// =============================================================================
 targetScope = 'resourceGroup'
 
-// -----------------------------------------------------------------------------
-// Parameters - Simplified for core resources
-// -----------------------------------------------------------------------------
-@description('Short project name used in resource names.')
-@minLength(2)
-@maxLength(8)
-param projectName string = 'ekg'
+@description('Project name used in resource naming. Lowercase, 3-10 chars.')
+@minLength(3)
+@maxLength(10)
+param projectName string
 
-@description('Environment name (e.g. dev, test, prod).')
+@description('Deployment environment name used in resource naming.')
 @allowed([
   'dev'
   'test'
+  'stage'
   'prod'
 ])
-param environmentName string = 'test'
+param environmentName string
 
-@description('Azure region for all resources.')
-param location string
+@description('Azure region for the primary deployment.')
+param location string = resourceGroup().location
 
-@description('Object ID of the user/service principal that should get Key Vault Administrator.')
+@description('Object ID of an administrator to grant Key Vault Administrator access. Leave empty to skip.')
 param adminPrincipalId string = ''
 
-@description('Deploy Azure Front Door Premium and WAF. Requires a reachable HTTPS origin hostname.')
+@description('Whether to deploy Azure Front Door Premium with WAF protection.')
 param deployFrontDoor bool = false
 
-@description('Front Door origin hostname without https://. Required when deployFrontDoor is true.')
+@description('Origin hostname for Front Door when deployFrontDoor is true.')
 param frontDoorOriginHostName string = ''
 
-@description('Additional Azure regions for ACR geo-replication.')
-param acrReplicaLocations array = [
-  'westus2'
-]
+@description('Additional Azure regions for Azure Container Registry replicas.')
+param acrReplicaLocations array = []
 
-@description('Secondary region for Log Analytics workspace replication.')
+@description('Secondary region for Log Analytics replication.')
 param logAnalyticsReplicaLocation string = 'centralus'
 
-// -----------------------------------------------------------------------------
-// Naming
-// -----------------------------------------------------------------------------
-var regionAbbreviations = {
+var regionCodeMap = {
   eastus: 'eus'
   eastus2: 'eus2'
   westus: 'wus'
   westus2: 'wus2'
-  westus3: 'wus3'
   centralus: 'cus'
-  swedencentral: 'sdc'
   northeurope: 'neu'
   westeurope: 'weu'
-  uksouth: 'uks'
-  australiaeast: 'aue'
 }
-var regionCode = regionAbbreviations[?location] ?? take(replace(toLower(location), ' ', ''), 6)
+var regionCode = contains(regionCodeMap, location) ? regionCodeMap[location] : toLower(replace(location, ' ', ''))
 
-var namePrefix = '${projectName}-${environmentName}-${regionCode}'
-
-var names = {
-  vnet: 'vnet-${namePrefix}'
-  keyVault: 'kv-${namePrefix}'
-  logAnalytics: 'log-${namePrefix}'
-  appInsights: 'appi-${namePrefix}'
-  actionGroup: 'ag-${namePrefix}'
-  managedIdentity: namePrefix
-  containerAppsEnv: 'cae-${namePrefix}'
-  acr: 'acr${projectName}${environmentName}${regionCode}'
-  frontDoorProfile: 'afd-${namePrefix}'
-  frontDoorEndpoint: 'afde-${projectName}${environmentName}${regionCode}'
-  frontDoorWaf: 'waf-${namePrefix}'
+var prefix = '${projectName}-${environmentName}-${regionCode}'
+var tags = {
+  environment: environmentName
+  managedBy: 'bicep'
+  project: projectName
 }
 
-// -----------------------------------------------------------------------------
-// Managed Identities
-// -----------------------------------------------------------------------------
+var vnetName = 'vnet-${prefix}'
+var keyVaultName = 'kv-${prefix}'
+var logAnalyticsName = 'log-${prefix}'
+var appInsightsName = 'appi-${prefix}'
+var actionGroupName = 'ag-${prefix}'
+var acrName = 'acr${toLower(replace(projectName, '-', ''))}${toLower(environmentName)}${regionCode}'
+var frontDoorProfileName = 'afd-${prefix}'
+var frontDoorEndpointName = 'afde${toLower(replace(projectName, '-', ''))}${toLower(environmentName)}${regionCode}'
+var frontDoorWafPolicyName = 'waf-${prefix}'
+
 module identity 'modules/identity.bicep' = {
   name: 'identity'
   params: {
-    namePrefix: names.managedIdentity
+    namePrefix: prefix
     location: location
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
+    tags: tags
   }
 }
 
-// -----------------------------------------------------------------------------
-// Networking (VNet + Subnets + NSGs)
-// -----------------------------------------------------------------------------
 module network 'modules/network.bicep' = {
   name: 'network'
   params: {
-    name: names.vnet
+    name: vnetName
     location: location
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
-    workloadSubnetPrefix: '10.20.4.0/24'
+    tags: tags
   }
 }
 
-// -----------------------------------------------------------------------------
-// Key Vault with RBAC & Diagnostics
-// -----------------------------------------------------------------------------
-module keyVault 'modules/keyvault.bicep' = {
-  name: 'keyVault'
-  params: {
-    name: names.keyVault
-    location: location
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
-    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
-    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
-    adminPrincipalId: adminPrincipalId
-    appIdentityPrincipalId: identity.outputs.appIdentityPrincipalId
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Private DNS Zones
-// -----------------------------------------------------------------------------
-module privateDns 'modules/privateDns.bicep' = {
-  name: 'privateDns'
-  params: {
-    vnetId: network.outputs.vnetId
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Private Endpoints (for Key Vault only)
-// -----------------------------------------------------------------------------
-module privateEndpoints 'modules/privateEndpoints.bicep' = {
-  name: 'privateEndpoints'
-  params: {
-    location: location
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
-    peSubnetId: network.outputs.peSubnetId
-    dnsZoneIds: privateDns.outputs.zoneIds
-    keyVaultId: keyVault.outputs.id
-    containerRegistryId: containerRegistry.id
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Log Analytics + Application Insights + Action Group
-// -----------------------------------------------------------------------------
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
   params: {
-    logAnalyticsName: names.logAnalytics
-    appInsightsName: names.appInsights
-    actionGroupName: names.actionGroup
+    logAnalyticsName: logAnalyticsName
+    appInsightsName: appInsightsName
+    actionGroupName: actionGroupName
     location: location
     replicaLocation: logAnalyticsReplicaLocation
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
-    emailReceivers: []
+    tags: tags
   }
 }
 
-// -----------------------------------------------------------------------------
-// Azure Container Registry
-// -----------------------------------------------------------------------------
-resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
-  name: names.acr
-  location: location
-  tags: {
-    environment: environmentName
-    managedBy: 'bicep'
-    company: 'MAQ Software'
-    createdBy: 'nishantr@maqsoftware.com'
-  }
-  sku: {
-    name: 'Premium'
-  }
-  properties: {
-    adminUserEnabled: false
-    publicNetworkAccess: 'Disabled'
-    policies: {
-      exportPolicy: {
-        status: 'disabled'
-      }
-    }
-  }
-}
-
-resource containerRegistryReplications 'Microsoft.ContainerRegistry/registries/replications@2023-07-01' = [for replicaLocation in acrReplicaLocations: {
-  name: '${names.acr}-${replicaLocation}'
-  location: replicaLocation
-  properties: {
-    zoneRedundancy: 'Enabled'
-  }
-  parent: containerRegistry
-}]
-
-// -----------------------------------------------------------------------------
-// Container Apps Environment
-// -----------------------------------------------------------------------------
-module containerAppsEnv 'modules/containerAppsEnv.bicep' = {
-  name: 'containerAppsEnv'
+module containerRegistry 'modules/containerRegistry.bicep' = {
+  name: 'container-registry'
   params: {
-    name: names.containerAppsEnv
+    name: acrName
     location: location
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
-    infrastructureSubnetId: network.outputs.acaSubnetId
+    tags: tags
+    sku: 'Standard'
+    replicaLocations: acrReplicaLocations
+  }
+}
+
+module keyVault 'modules/keyvault.bicep' = {
+  name: 'keyvault'
+  params: {
+    name: keyVaultName
+    location: location
+    tags: tags
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+    adminPrincipalId: adminPrincipalId
+    appIdentityPrincipalId: identity.outputs.appIdentityPrincipalId
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
   }
 }
 
-// -----------------------------------------------------------------------------
-// Azure Front Door Premium + WAF (optional)
-// -----------------------------------------------------------------------------
-module frontDoorWaf 'modules/frontDoorWaf.bicep' = if (deployFrontDoor) {
-  name: 'frontDoorWaf'
+module privateDns 'modules/privateDns.bicep' = {
+  name: 'private-dns'
   params: {
-    profileName: names.frontDoorProfile
-    endpointName: names.frontDoorEndpoint
-    wafPolicyName: names.frontDoorWaf
-    originHostName: frontDoorOriginHostName
-    tags: {
-      environment: environmentName
-      managedBy: 'bicep'
-      company: 'MAQ Software'
-      createdBy: 'nishantr@maqsoftware.com'
-    }
+    vnetId: network.outputs.vnetId
+    tags: tags
   }
 }
 
-// -----------------------------------------------------------------------------
-// Outputs
-// -----------------------------------------------------------------------------
-output resourceGroupName string = resourceGroup().name
-output location string = location
-output vnetId string = network.outputs.vnetId
-output privateEndpointsSubnetId string = network.outputs.peSubnetId
-output containerAppsSubnetId string = network.outputs.acaSubnetId
-output workloadSubnetId string = network.outputs.workloadSubnetId
+module privateEndpoints 'modules/privateEndpoints.bicep' = {
+  name: 'private-endpoints'
+  params: {
+    location: location
+    tags: tags
+    peSubnetId: network.outputs.peSubnetId
+    dnsZoneIds: privateDns.outputs.zoneIds
+    keyVaultId: keyVault.outputs.id
+    containerRegistryId: containerRegistry.outputs.id
+  }
+}
+
+module containerAppsEnvironment 'modules/containerAppsEnv.bicep' = {
+  name: 'container-apps-environment'
+  params: {
+    name: 'cae-${prefix}'
+    location: location
+    tags: tags
+    infrastructureSubnetId: network.outputs.acaSubnetId
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+    appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
+    internalOnly: true
+  }
+}
+
+module frontDoor 'modules/frontDoorWaf.bicep' = if (deployFrontDoor && !empty(frontDoorOriginHostName)) {
+  name: 'front-door'
+  params: {
+    profileName: frontDoorProfileName
+    endpointName: frontDoorEndpointName
+    wafPolicyName: frontDoorWafPolicyName
+    originHostName: frontDoorOriginHostName
+    tags: tags
+  }
+}
+
+module postDeployVerify 'modules/postDeployVerify.bicep' = {
+  name: 'post-deploy-verify'
+  params: {
+    name: 'ds-verify-${prefix}'
+    location: location
+    tags: tags
+    userAssignedIdentityId: identity.outputs.appIdentityId
+    keyVaultName: keyVault.outputs.name
+    secretName: 'appinsights-connection-string'
+  }
+}
+
+output projectPrefix string = prefix
+output vnetName string = network.outputs.vnetName
 output keyVaultName string = keyVault.outputs.name
-output keyVaultUri string = keyVault.outputs.uri
+output managedIdentityName string = identity.outputs.appIdentityName
+output containerAppsEnvironmentName string = containerAppsEnvironment.outputs.environmentName
 output logAnalyticsWorkspaceId string = monitoring.outputs.logAnalyticsWorkspaceId
-output actionGroupId string = monitoring.outputs.actionGroupId
-output containerAppsEnvironmentName string = containerAppsEnv.outputs.environmentName
-output frontDoorEndpointHostName string = frontDoorWaf.?outputs.endpointHostName ?? ''
+output applicationInsightsConnectionStringSecretName string = 'appinsights-connection-string'
+output acrName string = containerRegistry.outputs.name
+output frontDoorProfileName string = deployFrontDoor ? frontDoor.?outputs.profileId ?? '' : ''

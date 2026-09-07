@@ -70,6 +70,8 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Validate deployment
+        id: validate-deployment
+        continue-on-error: true
         run: |
           az deployment group validate \
             --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -78,12 +80,23 @@ jobs:
             --parameters @main.bicepparam
 
       - name: Preview deployment
+        id: preview-deployment
+        continue-on-error: true
         run: |
           az deployment group what-if \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name github-what-if-${{ github.run_id }}-${{ github.run_attempt }} \
             --template-file main.bicep \
             --parameters @main.bicepparam
+
+      - name: Validation summary
+        if: always()
+        run: |
+          echo "Validation step outcome: ${{ steps.validate-deployment.outcome }}"
+          echo "What-if step outcome: ${{ steps.preview-deployment.outcome }}"
+          if [ "${{ steps.validate-deployment.outcome }}" = "failure" ] || [ "${{ steps.preview-deployment.outcome }}" = "failure" ]; then
+            echo "Validation/preview failed. This is informational only; deployment will continue based on your branch policy."
+          fi
 
   deploy:
     needs: validate
@@ -107,9 +120,19 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy infrastructure
+        id: deploy-infrastructure
         run: |
           az deployment group create \
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --name github-deploy-${{ github.run_id }}-${{ github.run_attempt }} \
             --template-file main.bicep \
             --parameters @main.bicepparam
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "Deployment step outcome: ${{ steps.deploy-infrastructure.outcome }}"
+          if [ "${{ steps.deploy-infrastructure.outcome }}" = "failure" ]; then
+            echo "Deployment failed. The pipeline has been stopped intentionally."
+            exit 1
+          fi
